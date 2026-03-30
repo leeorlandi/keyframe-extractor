@@ -7,13 +7,13 @@ Steps:
 
 2. Run the extractor:
    ```
-   python3 REPO_PATH/extract.py '<video_path>' --output REPO_PATH/output
+   python3 REPO_PATH/extract.py '<video_path>'
    ```
 
-3. After extraction completes, read the file at:
-   `REPO_PATH/output/context.md`
+3. The output lands in a `.keyframes/` folder next to the video file.
+   After extraction completes, read: `<video_dir>/.keyframes/context.md`
 
-4. Read every image in `REPO_PATH/output/frames/` (sorted by filename).
+4. Read every image in `<video_dir>/.keyframes/frames/` (sorted by filename).
 
 5. Present everything inline:
    - Show the timeline from context.md

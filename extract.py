@@ -247,8 +247,8 @@ def main():
                         help="Change detection threshold 0-1 (default: 0.04)")
     parser.add_argument("--interval", type=float, default=0.5,
                         help="Sampling interval in seconds (default: 0.5)")
-    parser.add_argument("--output", default="./output",
-                        help="Output directory (default: ./output)")
+    parser.add_argument("--output", default=None,
+                        help="Output directory (default: .keyframes/ next to the video)")
     parser.add_argument("--scale", type=int, default=320,
                         help="Frame width in pixels (default: 320)")
     args = parser.parse_args()
@@ -259,7 +259,7 @@ def main():
         sys.exit(1)
 
     video_name = Path(video_path).name
-    output_dir = os.path.abspath(args.output)
+    output_dir = os.path.abspath(args.output) if args.output else os.path.join(os.path.dirname(video_path), ".keyframes")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"\nKeyframe Extractor")
