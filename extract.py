@@ -134,9 +134,10 @@ def extract_frame(video_path: str, timestamp: float, out_path: str, scale: int =
 def extract_keyframes(
     video_path: str,
     output_dir: str,
-    threshold: float = 0.04,
+    threshold: float = 0.02,
     interval: float = 0.5,
     scale: int = 320,
+    min_frames: int = 5,
 ) -> list[dict]:
     """
     Extract keyframes from video.
@@ -164,34 +165,38 @@ def extract_keyframes(
 
     print(f"  Extracted {len(candidates)} candidate frames, running diff filter...")
 
-    keyframes = []
+    # Score all candidates
+    scored = []
     prev_pixels = None
-    kf_index = 1
-
     for cand in candidates:
         try:
             pixels, w, h = read_png_pixels(cand["path"])
         except Exception:
             continue
+        diff = 0.0 if prev_pixels is None else frame_diff(prev_pixels, pixels)
+        scored.append({**cand, "pixels": pixels, "diff_score": round(diff, 4)})
+        prev_pixels = pixels
 
-        if prev_pixels is None:
-            # Always keep the first frame
-            diff = 0.0
-        else:
-            diff = frame_diff(prev_pixels, pixels)
+    # Select frames that cross the threshold
+    selected = [c for c in scored if c["diff_score"] == 0.0 or c["diff_score"] >= threshold]
 
-        if prev_pixels is None or diff >= threshold:
-            dest = os.path.join(frames_dir, f"{kf_index:04d}_t{cand['timestamp']:.2f}s.png")
-            shutil.copy2(cand["path"], dest)
-            keyframes.append({
-                "index": kf_index,
-                "timestamp": cand["timestamp"],
-                "path": dest,
-                "filename": os.path.basename(dest),
-                "diff_score": round(diff, 4),
-            })
-            prev_pixels = pixels
-            kf_index += 1
+    # If too few frames selected, fall back to evenly-spaced picks from scored
+    if len(selected) < min_frames and len(scored) >= min_frames:
+        step = len(scored) / min_frames
+        selected = [scored[int(i * step)] for i in range(min_frames)]
+        print(f"  Too few frames above threshold — falling back to {min_frames} evenly-spaced frames.")
+
+    keyframes = []
+    for kf_index, cand in enumerate(selected, start=1):
+        dest = os.path.join(frames_dir, f"{kf_index:04d}_t{cand['timestamp']:.2f}s.png")
+        shutil.copy2(cand["path"], dest)
+        keyframes.append({
+            "index": kf_index,
+            "timestamp": cand["timestamp"],
+            "path": dest,
+            "filename": os.path.basename(dest),
+            "diff_score": cand["diff_score"],
+        })
 
     # Cleanup tmp
     shutil.rmtree(tmp_dir, ignore_errors=True)
@@ -251,6 +256,8 @@ def main():
                         help="Output directory (default: .keyframes/ next to the video)")
     parser.add_argument("--scale", type=int, default=320,
                         help="Frame width in pixels (default: 320)")
+    parser.add_argument("--min-frames", type=int, default=5,
+                        help="Minimum keyframes to extract regardless of threshold (default: 5)")
     args = parser.parse_args()
 
     video_path = os.path.abspath(args.video)
@@ -273,6 +280,7 @@ def main():
         threshold=args.threshold,
         interval=args.interval,
         scale=args.scale,
+        min_frames=args.min_frames,
     )
 
     if not keyframes:
