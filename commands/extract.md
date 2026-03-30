@@ -10,10 +10,10 @@ Steps:
    python3 REPO_PATH/extract.py '<video_path>'
    ```
 
-3. The output lands in a `.keyframes/` folder next to the video file.
-   After extraction completes, read: `<video_dir>/.keyframes/context.md`
+3. The output lands in `.keyframes/` inside the current working directory (the project you're in).
+   After extraction completes, read: `.keyframes/context.md` (relative to cwd)
 
-4. Read every image in `<video_dir>/.keyframes/frames/` (sorted by filename).
+4. Read every image in `.keyframes/frames/` (relative to cwd, sorted by filename).
 
 5. Present everything inline:
    - Show the timeline from context.md

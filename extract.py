@@ -165,26 +165,32 @@ def extract_keyframes(
 
     print(f"  Extracted {len(candidates)} candidate frames, running diff filter...")
 
-    # Score all candidates
-    scored = []
+    # Score all candidates using diff filter
+    selected = []
     prev_pixels = None
+    readable = []  # all candidates we could read, for fallback
     for cand in candidates:
         try:
             pixels, w, h = read_png_pixels(cand["path"])
         except Exception:
             continue
         diff = 0.0 if prev_pixels is None else frame_diff(prev_pixels, pixels)
-        scored.append({**cand, "pixels": pixels, "diff_score": round(diff, 4)})
-        prev_pixels = pixels
+        entry = {**cand, "diff_score": round(diff, 4)}
+        readable.append(entry)
+        if prev_pixels is None or diff >= threshold:
+            selected.append(entry)
+            prev_pixels = pixels
 
-    # Select frames that cross the threshold
-    selected = [c for c in scored if c["diff_score"] == 0.0 or c["diff_score"] >= threshold]
+    print(f"  {len(readable)} frames readable, {len(selected)} above threshold.")
 
-    # If too few frames selected, fall back to evenly-spaced picks from scored
-    if len(selected) < min_frames and len(scored) >= min_frames:
-        step = len(scored) / min_frames
-        selected = [scored[int(i * step)] for i in range(min_frames)]
-        print(f"  Too few frames above threshold — falling back to {min_frames} evenly-spaced frames.")
+    # If too few frames selected, fall back to evenly-spaced picks from all readable frames
+    if len(selected) < min_frames and len(readable) >= min_frames:
+        step = len(readable) / min_frames
+        selected = [readable[int(i * step)] for i in range(min_frames)]
+        print(f"  Falling back to {min_frames} evenly-spaced frames.")
+    elif len(selected) < min_frames and readable:
+        # Fewer readable frames than min_frames — just use all of them
+        selected = readable
 
     keyframes = []
     for kf_index, cand in enumerate(selected, start=1):
@@ -260,13 +266,16 @@ def main():
                         help="Minimum keyframes to extract regardless of threshold (default: 5)")
     args = parser.parse_args()
 
-    video_path = os.path.abspath(args.video)
+    # Normalize unicode in path (handles macOS narrow no-break space in recording filenames)
+    import unicodedata
+    raw_path = unicodedata.normalize("NFC", args.video)
+    video_path = os.path.abspath(raw_path)
     if not os.path.exists(video_path):
         print(f"Error: file not found: {video_path}", file=sys.stderr)
         sys.exit(1)
 
     video_name = Path(video_path).name
-    output_dir = os.path.abspath(args.output) if args.output else os.path.join(os.path.dirname(video_path), ".keyframes")
+    output_dir = os.path.abspath(args.output) if args.output else os.path.join(os.getcwd(), ".keyframes")
     os.makedirs(output_dir, exist_ok=True)
 
     print(f"\nKeyframe Extractor")
