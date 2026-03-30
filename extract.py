@@ -266,13 +266,17 @@ def main():
                         help="Minimum keyframes to extract regardless of threshold (default: 5)")
     args = parser.parse_args()
 
-    # Normalize unicode in path (handles macOS narrow no-break space in recording filenames)
-    import unicodedata
-    raw_path = unicodedata.normalize("NFC", args.video)
-    video_path = os.path.abspath(raw_path)
+    video_path = os.path.abspath(args.video)
     if not os.path.exists(video_path):
-        print(f"Error: file not found: {video_path}", file=sys.stderr)
-        sys.exit(1)
+        # macOS screen recording filenames use U+202F (narrow no-break space) before AM/PM.
+        # When the path is typed or pasted it often comes through as a regular space.
+        # Try swapping regular spaces → U+202F to find the actual file.
+        candidate = video_path.replace(" ", "\u202f")
+        if os.path.exists(candidate):
+            video_path = candidate
+        else:
+            print(f"Error: file not found: {video_path}", file=sys.stderr)
+            sys.exit(1)
 
     video_name = Path(video_path).name
     output_dir = os.path.abspath(args.output) if args.output else os.path.join(os.getcwd(), ".keyframes")
